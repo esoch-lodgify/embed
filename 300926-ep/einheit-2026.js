@@ -89,7 +89,17 @@
 
     // --- top bar ---
     showBar: true,
-    barMode: 'flow',         // 'flow' | 'sticky' | 'fixed'
+    // 'push'   bar sits in normal flow AND anything pinned to the top of the
+    //          viewport (a fixed or sticky navbar) is offset by its height,
+    //          so the nav moves down instead of covering the bar.
+    // 'flow'   bar in normal flow, nothing else touched.
+    // 'sticky' / 'fixed'  bar pinned itself; the page is not offset.
+    barMode: 'push',
+
+    // Leave empty to auto-detect what is pinned to the top. If the nav is
+    // missed or the wrong thing moves, put the nav's selector here, e.g.
+    // fixedHeaderSelector: '.navbar_component',
+    fixedHeaderSelector: '',
     barDismissDays: 7,       // the German set's own choice
 
     // --- exit popup ---
@@ -230,6 +240,34 @@
      4 · STYLES
      ===================================================================== */
   var CSS = `
+/* ---------- scoped reset, emitted BEFORE the component CSS ----------------
+   Two passes, deliberately at different strengths.
+
+   1. :where(...) at zero specificity for box model and layout leftovers.
+   2. Exactly ONE class of specificity for everything inherited, with the tag
+      list inside :where() so the tags add nothing. That calibration is the
+      whole point: it outranks the host site's bare h2/p/a/button rules
+      (0,0,1), and loses to every component rule, which carry at least one
+      class and come later in the file.
+
+   Pass 2 is what keeps .ldg-modal__h white. The heading sets no colour of its
+   own -- it inherits from .ldg-modal__box -- so lodgify.com's global h2 rule
+   was winning and turning it dark. */
+:where(#ldgDeBar,#ldgDeBar *,#ldgDeModal,#ldgDeModal *){
+  box-sizing:border-box;min-width:0;outline:0;box-shadow:none;float:none;
+  list-style:none;vertical-align:baseline;
+}
+.ldg-bar :where(h1,h2,h3,h4,h5,h6,p,a,b,i,em,strong,small,span,div,button,ul,ol,li,svg,img,figure),
+.ldg-modal__frame :where(h1,h2,h3,h4,h5,h6,p,a,b,i,em,strong,small,span,div,button,ul,ol,li,svg,img,figure){
+  margin:0;padding:0;border:0;background:none;border-radius:0;
+  font-family:inherit;font-size:inherit;font-weight:inherit;font-style:inherit;
+  line-height:inherit;letter-spacing:inherit;text-transform:none;
+  color:inherit;text-align:left;text-decoration:none;
+}
+:where(#ldgDeBar button,#ldgDeModal button){cursor:pointer}
+:where(#ldgDeBar svg,#ldgDeModal svg){display:block;flex:0 0 auto}
+
+
 /* LODGIFY EXIT POPUP - locked design. Tokens and the two injection
    points are the only things meant to change. */
 /* On the popup root, never :root -- see the skill. */
@@ -657,24 +695,16 @@
 .ldg-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
   padding:24px;overflow:auto;background:rgba(10,12,8,.6);backdrop-filter:blur(3px)}
 
-/* ---------- scoped reset (keeps host-site CSS out of the promo) ----------
-   :where() carries zero specificity, so every component rule above wins.
-   container-type on .ldg-modal__frame is deliberately not touched. */
-:where(#ldgDeBar,#ldgDeBar *,#ldgDeModal,#ldgDeModal *){
-  box-sizing:border-box;margin:0;padding:0;min-width:0;border:0;outline:0;
-  background:none;box-shadow:none;border-radius:0;float:none;
-  font:inherit;color:inherit;text-align:left;text-decoration:none;
-  text-transform:none;letter-spacing:inherit;line-height:inherit;
-  list-style:none;vertical-align:baseline;
-}
-:where(#ldgDeBar button,#ldgDeModal button){cursor:pointer}
-:where(#ldgDeBar svg,#ldgDeModal svg){display:block;flex:0 0 auto}
+/* ---------- host-page hardening (emitted AFTER the component CSS) ---------- */
 #ldgDeBar .ldg-bar__msg a,#ldgDeModal .ldg-modal__fine a{text-decoration:underline}
+/* the heading inherits its colour; state it outright so nothing can win it */
+#ldgDeModal .ldg-modal__h{color:var(--ldg-white)}
 
 /* ---------- host-page hardening ---------- */
 #ldgDeModal.ldg-overlay{z-index:2147483000;overscroll-behavior:contain;
   align-items:safe center;justify-items:center}
 html.ldg-scroll-lock{overflow:hidden !important}
+#ldgDeBar[data-ldg-bar="push"],#ldgDeBar[data-ldg-bar="flow"]{position:relative;z-index:2147482000}
 #ldgDeBar[data-ldg-bar="sticky"]{position:sticky;top:0;z-index:2147482000}
 #ldgDeBar[data-ldg-bar="fixed"]{position:fixed;top:0;left:0;right:0;z-index:2147482000}
 
@@ -792,6 +822,75 @@ html.ldg-scroll-lock{overflow:hidden !important}
   /* =====================================================================
      7 · Render
      ===================================================================== */
+
+  /* ---------------------------------------------------------------------
+     Pushing the page down for the bar
+
+     The bar sits in normal flow, so ordinary page content moves down on its
+     own. What does not move is anything taken out of flow and pinned to the
+     top of the viewport -- a fixed or sticky navbar -- which would otherwise
+     sit on top of the bar. Those get their `top` offset by the bar's height,
+     shrinking back to 0 as the bar scrolls away so no gap is left behind.
+     --------------------------------------------------------------------- */
+  function findPinned() {
+    var nodes = [];
+    try {
+      if (CONFIG.fixedHeaderSelector) {
+        nodes = document.querySelectorAll(CONFIG.fixedHeaderSelector);
+      } else if (document.elementsFromPoint) {
+        // whatever is actually painted at the very top edge, nothing broader
+        nodes = document.elementsFromPoint(Math.round(window.innerWidth / 2), 1) || [];
+      }
+    } catch (e) { return []; }
+    var out = [];
+    [].forEach.call(nodes, function (el) {
+      if (!el || el === document.body || el === document.documentElement) return;
+      var cs;
+      try { cs = window.getComputedStyle(el); } catch (e) { return; }
+      if (!cs || (cs.position !== 'fixed' && cs.position !== 'sticky')) return;
+      if (Math.abs(parseFloat(cs.top) || 0) > 1) return;   // not pinned to 0
+      if (out.indexOf(el) === -1) out.push(el);
+    });
+    return out;
+  }
+
+  function pushPinned(bar, pinned) {
+    if (!pinned.length) return null;
+    var prev = pinned.map(function (el) { return el.style.top; });
+    var height = 0, frame = null;
+
+    function apply() {
+      frame = null;
+      var offset = Math.max(0, height - (window.scrollY || 0));
+      pinned.forEach(function (el) { el.style.top = offset + 'px'; });
+    }
+    var raf = window.requestAnimationFrame
+      ? function (fn) { return window.requestAnimationFrame(fn); }
+      : function (fn) { return setTimeout(fn, 16); };
+    var unraf = window.cancelAnimationFrame
+      ? function (id) { window.cancelAnimationFrame(id); }
+      : function (id) { clearTimeout(id); };
+    function schedule() { if (frame === null) frame = raf(apply); }
+    function measure() {
+      height = bar.classList.contains('ldg-hide') ? 0 : bar.getBoundingClientRect().height;
+      schedule();
+    }
+
+    measure();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', measure);
+    var ro = ('ResizeObserver' in window) ? new ResizeObserver(measure) : null;
+    if (ro) ro.observe(bar);
+
+    return function restore() {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', measure);
+      if (ro) ro.disconnect();
+      if (frame !== null) unraf(frame);
+      pinned.forEach(function (el, i) { el.style.top = prev[i]; });
+    };
+  }
+
   function mount() {
     if (CONFIG.loadFonts) {
       var f = document.createElement('link');
@@ -817,10 +916,13 @@ html.ldg-scroll-lock{overflow:hidden !important}
 
     /* ---- top bar ---- */
     var bar = null;
+    var unpush = null;
     if (CONFIG.showBar && !barDismissed()) {
       bar = build(BAR);
       bar.setAttribute('data-ldg-bar', CONFIG.barMode);
+      var pinned = (CONFIG.barMode === 'push') ? findPinned() : [];
       document.body.insertBefore(bar, document.body.firstChild);
+      if (CONFIG.barMode === 'push') unpush = pushPinned(bar, pinned);
     }
 
     /* ---- popup ---- */
@@ -902,6 +1004,7 @@ html.ldg-scroll-lock{overflow:hidden !important}
     function closeBar() {
       if (!bar) return;
       bar.classList.add('ldg-hide');
+      if (unpush) { unpush(); unpush = null; }
       markBarDismissed();
       if (!modalOpen) stopTicker();
     }
