@@ -96,6 +96,12 @@
     // 'sticky' / 'fixed'  bar pinned itself; the page is not offset.
     barMode: 'push',
 
+    // lodgify.com's <body> carries 5px of padding, which insets the bar and
+    // shunts the nav around. The bar pulls itself out by this much on top,
+    // left and right, and gives it back as bottom margin so everything below
+    // keeps its original position. Set to 0 if the body padding ever goes.
+    barBleed: 5,
+
     // Leave empty to auto-detect what is pinned to the top. If the nav is
     // missed or the wrong thing moves, put the nav's selector here, e.g.
     // fixedHeaderSelector: '.navbar_component',
@@ -704,7 +710,9 @@
 #ldgDeModal.ldg-overlay{z-index:2147483000;overscroll-behavior:contain;
   align-items:safe center;justify-items:center}
 html.ldg-scroll-lock{overflow:hidden !important}
-#ldgDeBar[data-ldg-bar="push"],#ldgDeBar[data-ldg-bar="flow"]{position:relative;z-index:2147482000}
+#ldgDeBar[data-ldg-bar="push"],#ldgDeBar[data-ldg-bar="flow"]{
+  position:relative;z-index:2147482000;
+  margin:calc(var(--ldg-bar-bleed,0px) * -1) calc(var(--ldg-bar-bleed,0px) * -1) var(--ldg-bar-bleed,0px)}
 #ldgDeBar[data-ldg-bar="sticky"]{position:sticky;top:0;z-index:2147482000}
 #ldgDeBar[data-ldg-bar="fixed"]{position:fixed;top:0;left:0;right:0;z-index:2147482000}
 
@@ -920,6 +928,7 @@ html.ldg-scroll-lock{overflow:hidden !important}
     if (CONFIG.showBar && !barDismissed()) {
       bar = build(BAR);
       bar.setAttribute('data-ldg-bar', CONFIG.barMode);
+      bar.style.setProperty('--ldg-bar-bleed', (CONFIG.barBleed || 0) + 'px');
       var pinned = (CONFIG.barMode === 'push') ? findPinned() : [];
       document.body.insertBefore(bar, document.body.firstChild);
       if (CONFIG.barMode === 'push') unpush = pushPinned(bar, pinned);
