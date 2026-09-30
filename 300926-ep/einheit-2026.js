@@ -710,8 +710,12 @@
 #ldgDeModal.ldg-overlay{z-index:2147483000;overscroll-behavior:contain;
   align-items:safe center;justify-items:center}
 html.ldg-scroll-lock{overflow:hidden !important}
+/* The bar pulls itself out of the host body's padding. width must be auto:
+   .ldg-bar ships width:100%, and a block box with an explicit width ignores
+   its right margin, so the negative left margin shifted it over but the right
+   edge stayed 2x bleed short. width:auto absorbs both margins instead. */
 #ldgDeBar[data-ldg-bar="push"],#ldgDeBar[data-ldg-bar="flow"]{
-  position:relative;z-index:2147482000;
+  position:relative;z-index:2147482000;width:auto;
   margin:calc(var(--ldg-bar-bleed,0px) * -1) calc(var(--ldg-bar-bleed,0px) * -1) var(--ldg-bar-bleed,0px)}
 #ldgDeBar[data-ldg-bar="sticky"]{position:sticky;top:0;z-index:2147482000}
 #ldgDeBar[data-ldg-bar="fixed"]{position:fixed;top:0;left:0;right:0;z-index:2147482000}
