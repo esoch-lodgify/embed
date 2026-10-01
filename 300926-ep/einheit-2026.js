@@ -706,6 +706,19 @@
 /* the heading inherits its colour; state it outright so nothing can win it */
 #ldgDeModal .ldg-modal__h{color:var(--ldg-white)}
 
+/* ---------- top bar countdown, optical centring ----------
+   .ldg-bar__in centres on the flex box, and the box is centred correctly --
+   but the ink inside it is not. .ldg-count__num carries line-height:1, so the
+   digits' ascenders spill above their line box while the label underneath
+   keeps its normal descender space. Measured against the pill, the message
+   and the CTA (all landing on the bar's centre), the countdown's ink centre
+   sits 2.75px high.
+   Nudged with position, not margin or padding: under align-items:center a
+   margin would be split in half by the alignment and a padding would grow the
+   box and re-centre it, so neither moves the ink by the amount asked for.
+   Bar only -- the popup timer has its own layout and centres fine. */
+#ldgDeBar .ldg-count{position:relative;top:3px}
+
 /* ---------- host-page hardening ---------- */
 #ldgDeModal.ldg-overlay{z-index:2147483000;overscroll-behavior:contain;
   align-items:safe center;justify-items:center}
