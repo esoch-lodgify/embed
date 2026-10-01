@@ -60,6 +60,11 @@
     // photoSet: 'image-set(url("...einheit-2026-photo.avif") type("image/avif"),'
     //         + ' url("...einheit-2026-photo.jpg") type("image/jpeg"))',
 
+    // Where both CTAs point -- the top bar link and the popup's button and
+    // arrow. The AGB / T&C link in the small print is separate and is not
+    // affected by this.
+    ctaUrl: 'https://app.lodgify.com/signup/calendar-experience/de/',
+
     // Offer deadline. ISO 8601 with an explicit offset, so it is the same
     // instant for everyone regardless of their local clock.
     // 23:59:59 Uhr MESZ on 5 October 2026 (MESZ = UTC+2).
@@ -147,7 +152,7 @@
 
     <p class="ldg-bar__msg"><strong>Einheitlich sparen: 50 % Rabatt</strong> — <span class="ldg-code">EINHEIT26</span></p>
 
-    <a class="ldg-bar__cta" href="https://www.lodgify.com/de/tag-der-deutschen-einheit-promo/">
+    <a class="ldg-bar__cta" href="__CTA__">
       <span>50 % Rabatt sichern</span>
       <span class="ldg-bar__arrow" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
@@ -196,8 +201,8 @@
 
       <div class="ldg-modal__row">
         <div class="ldg-swap">
-          <a class="ldg-btn" href="https://www.lodgify.com/de/tag-der-deutschen-einheit-promo/">50 % Rabatt sichern</a>
-          <a class="ldg-round" href="https://www.lodgify.com/de/tag-der-deutschen-einheit-promo/" aria-label="50 % Rabatt sichern">
+          <a class="ldg-btn" href="__CTA__">50 % Rabatt sichern</a>
+          <a class="ldg-round" href="__CTA__" aria-label="50 % Rabatt sichern">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
           </a>
         </div>
@@ -935,7 +940,7 @@ html.ldg-scroll-lock{overflow:hidden !important}
 
     function build(html) {
       var host = document.createElement('div');
-      host.innerHTML = html;
+      host.innerHTML = html.split('__CTA__').join(CONFIG.ctaUrl);
       return host.firstElementChild;
     }
 
