@@ -10,8 +10,18 @@
  *   <script src="https://YOUR-CDN/12oct-es-2026.js" defer></script>
  *
  * WHO SEES WHAT
- *   Spanish pages, anywhere in the world  -> bar + popup
- *   Any other locale, including English   -> nothing renders
+ *   Spanish IP AND a Spanish page   -> bar + popup
+ *   Spanish page, other country     -> nothing renders
+ *   Spanish IP, any other locale    -> nothing renders
+ *
+ *   Spain only: CONFIG.countries is ['ES'] because the puente del Pilar is a
+ *   Spanish national holiday. Spanish-language traffic is largely Latin
+ *   American, so this deliberately excludes it -- add 'MX','AR','CO','CL' to
+ *   that list to widen the campaign.
+ *
+ *   The locale is checked before the country, so visitors on English pages
+ *   never trigger the Cloudflare lookup. On /es/ the bar waits for it on a
+ *   first visit, then 24h of cache shared with the site's existing snippet.
  *
  *   There is NO geographic targeting and no Cloudflare lookup at all, so the
  *   bar paints on first render with no layout shift waiting on a fetch.
@@ -22,6 +32,7 @@
  *   of this file. Send a URL for it and it can come out.
  *
  * QA HELPERS (query string, no code changes needed)
+ *   ?ldgeo=ES      force the country, no VPN needed
  *   ?ldlang=es     force the Spanish gate open
  *   ?ldlang=en     force it shut, to check other locales render nothing
  *   ?ldexit=1      open the popup immediately, skip the exit trigger
@@ -56,10 +67,24 @@
     deadline: '2026-10-13T23:59:59+02:00',
 
     // --- targeting ---
-    // Spanish only, no geography -- so a Spanish-language visitor anywhere
-    // sees it, and a visitor in Spain reading English does not.
-    // <html lang> decides when present, which it is on lodgify.com; the path
-    // is the fallback.
+    // BOTH gates must pass: a Spanish IP AND a Spanish page. The locale is
+    // checked first, so a visitor on an English page never triggers the geo
+    // lookup at all.
+    // Spanish-language traffic is heavily Latin American; this list is Spain
+    // only because the puente del Pilar is a Spanish national holiday. Add
+    // 'MX','AR','CO','CL' etc. here to widen it.
+    countries: ['ES'],
+
+    // Country lookup, cached for 24h under the same key as the snippet
+    // already on the site, so the two share one request.
+    geoKey: 'geo_country',
+    geoTTL: 864e5,
+    geoEndpoint: 'https://www.cloudflare.com/cdn-cgi/trace',
+    geoTimeout: 2500,
+    setHtmlAttr: true,       // mirror onto <html data-country="..">
+
+    // <html lang> decides the locale when present, which it is on
+    // lodgify.com; the path is the fallback.
     esPath: /^\/es(-[a-z]{2})?(\/|$)/i,
     esHost: /^es\./i,
     useHtmlLang: true,
@@ -757,8 +782,41 @@ html.ldg-scroll-lock{overflow:hidden !important}
   }
 
   /* =====================================================================
-     6 · Is this a Spanish page?
+     6 · Country, then locale
      ===================================================================== */
+  function cachedCountry() {
+    try {
+      var o = JSON.parse(ls(CONFIG.geoKey) || 'null');
+      return (o && (Date.now() - o.t < CONFIG.geoTTL)) ? o.c : null;
+    } catch (e) { return null; }
+  }
+
+  function applyCountry(c) {
+    if (CONFIG.setHtmlAttr) document.documentElement.setAttribute('data-country', c);
+    return c;
+  }
+
+  function resolveCountry() {
+    var forced = (qs.get('ldgeo') || '').toUpperCase();
+    if (/^[A-Z]{2}$/.test(forced)) return Promise.resolve(applyCountry(forced));
+
+    var hit = cachedCountry();
+    if (hit) return Promise.resolve(applyCountry(hit));
+
+    var ctrl = ('AbortController' in window) ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, CONFIG.geoTimeout);
+
+    return fetch(CONFIG.geoEndpoint, ctrl ? { signal: ctrl.signal } : undefined)
+      .then(function (r) { return r.text(); })
+      .then(function (t) {
+        clearTimeout(timer);
+        var c = (t.match(/loc=([A-Z]{2})/) || [])[1] || 'XX';
+        ls(CONFIG.geoKey, JSON.stringify({ c: c, t: Date.now() }));
+        return applyCountry(c);
+      })
+      .catch(function () { clearTimeout(timer); return applyCountry('XX'); });
+  }
+
   function isSpanishPage() {
     var forced = (qs.get('ldlang') || '').toLowerCase();
     if (forced) return forced.slice(0, 2) === 'es';
@@ -1096,11 +1154,15 @@ html.ldg-scroll-lock{overflow:hidden !important}
     memPopupClosed = false;
     try { window.sessionStorage.removeItem(CONFIG.popupSessionKey); } catch (e) {}
     lsDel(CONFIG.barKey);
+    lsDel(CONFIG.geoKey);
   }
 
   if (expired()) return;
   if (document.getElementById('ldgEsBar') || document.getElementById('ldgEsModal')) return;
-  if (!isSpanishPage()) return;
+  if (!isSpanishPage()) return;   // cheap gate first: no lookup off /es/
 
-  ready(mount);
+  resolveCountry().then(function (country) {
+    if (CONFIG.countries.indexOf(country) === -1) return;
+    ready(mount);
+  });
 })();
