@@ -28,8 +28,8 @@
  *
  * COPY AND DATES
  *   CONFIG.deadline drives both countdowns and the auto-hide. The visible
- *   strings ("Live Wed, October 14 / 6:00 PM CEST", "Oct 14 at 6 PM CEST")
- *   are plain text in MARKUP. Change both together or they will disagree.
+ *   strings ("Live Wed, October 14 / 9:00 AM PT", "Oct 14 at 9 AM PT") are
+ *   plain text in MARKUP. Change both together or they will disagree.
  * ==========================================================================
  */
 
@@ -45,14 +45,19 @@
     // those visitors get the panel with no photo behind it.
     photoUrl: 'https://cdn.prod.website-files.com/6a0183d56ceb2deec6fd2e8c/6ac728b4e8ab746d11f9d663_ES_AUG_Calendar_1200x628%20(1).avif',
 
-    // Where all three CTAs point: the bar link, and the popup's button and
-    // arrow.
-    ctaUrl: 'https://www.lodgify.com/independent-host-summit/#Form-Embed',
+    // Both placements point at the same tagged URL, as requested. They are
+    // kept as separate values so they can be split again without touching
+    // anything else -- note that while they match, every click reports as
+    // utm_medium=popup, so analytics cannot tell the bar from the popup.
+    ctaUrl:      'https://www.lodgify.com/independent-host-summit/?utm_source=content&utm_medium=popup&utm_campaign=Summit26',
+    popupCtaUrl: 'https://www.lodgify.com/independent-host-summit/?utm_source=content&utm_medium=popup&utm_campaign=Summit26',
 
     // When the summit goes live. ISO 8601 with an explicit offset, so it is
     // the same instant for everyone regardless of their local clock.
-    // 6:00 PM CEST on 14 October 2026 (CEST = UTC+2).
-    deadline: '2026-10-14T18:00:00+02:00',
+    // 9:00 AM PT on 14 October 2026 (PDT = UTC-7). This is the same moment
+    // as the 18:00+02:00 it was written as before -- only the wording of the
+    // visible copy changed, so the countdown is unaffected.
+    deadline: '2026-10-14T09:00:00-07:00',
 
     // --- targeting ---
     // English only, no geography. <html lang> decides when it is present,
@@ -100,7 +105,7 @@
       Free livestream
     </span>
 
-    <p class="ldg-bar__msg"><strong>Independent Host Summit</strong>, Oct 14 at 6 PM CEST</p>
+    <p class="ldg-bar__msg"><strong>Independent Host Summit</strong>, Oct 14 at 9 AM PT</p>
 
     <a class="ldg-bar__cta" href="__CTA__">
       <span>Register for free</span>
@@ -170,7 +175,7 @@
         <div class="ldg-count__unit"><span class="ldg-count__num" data-unit="seconds">50</span><span class="ldg-count__lab">Secs</span></div>
       </div>
       <span class="ldg-timer__rule" aria-hidden="true"></span>
-      <p class="ldg-timer__ends">Live <b>Wed, October 14</b><br class="ldg-brk"> 6:00 PM CEST</p>
+      <p class="ldg-timer__ends">Live <b>Wed, October 14</b><br class="ldg-brk"> 9:00 AM PT</p>
       <div class="ldg-timer__stack">
         <span class="ldg-chip">
           <span class="ldg-chip__ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.6 6.6L21.5 9l-5 4.7 1.4 7L12 17.3 6.1 20.7l1.4-7L2.5 9l6.9-.4z"/></svg></span>
@@ -879,9 +884,10 @@ html.ldg-scroll-lock{overflow:hidden !important}
       + (CONFIG.extraCSS ? '\n\n/* CONFIG.extraCSS */\n' + CONFIG.extraCSS : '');
     document.head.appendChild(style);
 
-    function build(html) {
+    // one placeholder, a different URL per placement
+    function build(html, cta) {
       var host = document.createElement('div');
-      host.innerHTML = html.split('__CTA__').join(CONFIG.ctaUrl);
+      host.innerHTML = html.split('__CTA__').join(cta);
       return host.firstElementChild;
     }
 
@@ -889,7 +895,7 @@ html.ldg-scroll-lock{overflow:hidden !important}
     var bar = null;
     var unpush = null;
     if (CONFIG.showBar && !barDismissed()) {
-      bar = build(BAR);
+      bar = build(BAR, CONFIG.ctaUrl);
       bar.setAttribute('data-ldg-bar', CONFIG.barMode);
       bar.style.setProperty('--ldg-bar-bleed', (CONFIG.barBleed || 0) + 'px');
       bar.style.setProperty('--ldg-count-nudge', (CONFIG.barCountNudge || 0) + 'px');
@@ -901,7 +907,7 @@ html.ldg-scroll-lock{overflow:hidden !important}
     /* ---- popup ---- */
     var modal = null;
     if (CONFIG.showPopup && !popupClosed()) {
-      modal = build(MODAL);
+      modal = build(MODAL, CONFIG.popupCtaUrl);
       document.body.appendChild(modal);
     }
 
