@@ -24,6 +24,11 @@
  *   Background photo and -50% tag are hosted on Webflow's CDN (CONFIG.photoUrl,
  *   CONFIG.tagUrl), so this file carries no image payload.
  *
+ * COMPETING BANNER
+ *   Inside the audience above, the host page's #sticky-banner-component is
+ *   hidden (CONFIG.hideSelector) until the deadline. Outside it, nothing is
+ *   touched.
+ *
  * QA HELPERS (query string, no code changes needed)
  *   ?ldgeo=FR      force the country, no VPN needed
  *   ?ldlang=fr     force the French gate open
@@ -79,13 +84,19 @@
     frHost: /^fr\./i,
     useHtmlLang: true,
 
+    // A competing banner on the host page. Hidden for everyone in this
+    // campaign's audience (passes the locale and country gates, before the
+    // deadline) and put back at the deadline. Anyone outside the audience
+    // keeps it. '' disables.
+    hideSelector: '#sticky-banner-component',
+
     // --- top bar ---
     showBar: true,
     barMode: 'push',         // 'push' | 'flow' | 'sticky' | 'fixed'
     barBleed: 5,             // lodgify.com's <body> carries 5px of padding
     fixedHeaderSelector: '', // set if auto-detection misses the navbar
     barCountNudge: 3,        // optical centring for the bar countdown; 0 disables
-    barDismissDays: 7,
+    barDismissDays: 1,
 
     // --- exit popup (desktop only) ---
     showPopup: true,
@@ -809,6 +820,19 @@ html.ldg-scroll-lock{overflow:hidden !important}
                           .replace('__TAG__', function () { return CONFIG.tagUrl; })
       + (CONFIG.extraCSS ? '\n\n/* CONFIG.extraCSS */\n' + CONFIG.extraCSS : '');
     document.head.appendChild(style);
+
+    // Clear the competing banner first, so the bar's push logic never sees it
+    // as a pinned header. A stylesheet rather than an inline style, so it also
+    // holds if the host renders the banner after this runs.
+    if (CONFIG.hideSelector) {
+      var hideStyle = document.createElement('style');
+      hideStyle.id = style.id + '-hide';
+      hideStyle.textContent = CONFIG.hideSelector + '{display:none !important}';
+      document.head.appendChild(hideStyle);
+      setTimeout(function () {
+        if (hideStyle.parentNode) hideStyle.parentNode.removeChild(hideStyle);
+      }, Math.max(0, Math.min(END - Date.now(), 2147483647)));
+    }
 
     function build(html) {
       var host = document.createElement('div');
